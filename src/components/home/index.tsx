@@ -365,7 +365,7 @@ export default function LinkedInCarouselGenerator() {
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 placeholder="Paste your long-form content here... I'll help you transform it into an engaging LinkedIn carousel that will capture your audience's attention and drive meaningful engagement."
-                className="w-full h-64 p-4 border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                className="w-full h-64 p-4 border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-black"
                 maxLength={3000}
               />
               
