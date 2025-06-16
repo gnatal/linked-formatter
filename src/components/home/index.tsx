@@ -350,7 +350,7 @@ export default function LinkedInCarouselGenerator() {
                     <div className="text-center text-gray-500">
                       <Image className="w-16 h-16 mx-auto mb-4 opacity-50" />
                       <p className="text-lg font-medium mb-2">No slides generated yet</p>
-                      <p className="text-sm">Add your content and click "Generate Slides" to see the preview</p>
+                      <p className="text-sm">{`Add your content and click "Generate Slides" to see the preview`}</p>
                     </div>
                   </div>
                 )}
@@ -418,7 +418,7 @@ export default function LinkedInCarouselGenerator() {
                 
                 <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                   <p className="text-sm text-blue-800">
-                    <strong>LinkedIn Tip:</strong> Upload images in order to create your carousel post. Each slide is optimized at 1080x1080px for LinkedIn's requirements.
+                    <strong>LinkedIn Tip:</strong> {`Upload images in order to create your carousel post. Each slide is optimized at 1080x1080px for LinkedIn's requirements.`}
                   </p>
                 </div>
                 
