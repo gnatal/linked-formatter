@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PlusCircle, Download, Palette, Type, Image } from 'lucide-react';
 
 interface Slide {
@@ -25,62 +25,83 @@ export default function LinkedInCarouselGenerator() {
     fontSize: 'medium'
   });
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isZipLibLoaded, setIsZipLibLoaded] = useState(false);
+
+  // Load JSZip library
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    script.onload = () => setIsZipLibLoaded(true);
+    document.head.appendChild(script);
+    
+    return () => {
+      document.head.removeChild(script);
+    };
+  }, []);
 
   const handleGenerateSlides = () => {
     if (!inputText.trim()) return;
     
     setIsGenerating(true);
     
-    // Enhanced text splitting algorithm
-    const sentences = inputText.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    // Enhanced text splitting algorithm with line break detection
+    const paragraphs = inputText.split(/\n\s*\n|\n/).filter(p => p.trim().length > 0);
     const wordsPerSlide = 25; // Optimal for LinkedIn readability
     const newSlides: Slide[] = [];
-    
-    let currentSlideText = '';
     let slideCounter = 0;
     
-    sentences.forEach((sentence) => {
-      const words = sentence.trim().split(' ');
+    paragraphs.forEach((paragraph) => {
+      const trimmedParagraph = paragraph.trim();
+      if (!trimmedParagraph) return;
       
-      if (currentSlideText.split(' ').length + words.length > wordsPerSlide && currentSlideText.length > 0) {
+      // Check if the paragraph is short enough to be a single slide
+      const words = trimmedParagraph.split(' ');
+      if (words.length <= wordsPerSlide) {
+        // Add as a single slide
         newSlides.push({
           id: `slide-${slideCounter++}`,
-          content: currentSlideText.trim(),
+          content: trimmedParagraph,
           order: slideCounter,
-          characterCount: currentSlideText.trim().length
+          characterCount: trimmedParagraph.length
         });
-        currentSlideText = sentence.trim();
       } else {
-        currentSlideText += (currentSlideText ? '. ' : '') + sentence.trim();
+        // Split longer paragraphs by sentences
+        const sentences = trimmedParagraph.split(/[.!?]+/).filter(s => s.trim().length > 0);
+        let currentSlideText = '';
+        
+        sentences.forEach((sentence) => {
+          const sentenceWords = sentence.trim().split(' ');
+          
+          if (currentSlideText.split(' ').length + sentenceWords.length > wordsPerSlide && currentSlideText.length > 0) {
+            // Create a new slide with current content
+            newSlides.push({
+              id: `slide-${slideCounter++}`,
+              content: currentSlideText.trim(),
+              order: slideCounter,
+              characterCount: currentSlideText.trim().length
+            });
+            currentSlideText = sentence.trim();
+          } else {
+            currentSlideText += (currentSlideText ? '. ' : '') + sentence.trim();
+          }
+        });
+        
+        // Add the remaining content as a slide
+        if (currentSlideText.trim()) {
+          newSlides.push({
+            id: `slide-${slideCounter++}`,
+            content: currentSlideText.trim(),
+            order: slideCounter,
+            characterCount: currentSlideText.trim().length
+          });
+        }
       }
     });
     
-    // Add the last slide
-    if (currentSlideText.trim()) {
-      newSlides.push({
-        id: `slide-${slideCounter}`,
-        content: currentSlideText.trim(),
-        order: slideCounter + 1,
-        characterCount: currentSlideText.trim().length
-      });
-    }
-    
-    // Add a title slide at the beginning if content is long enough
-    if (newSlides.length > 3) {
-      const firstSentence = inputText.split(/[.!?]+/)[0].trim();
-      if (firstSentence.length > 0) {
-        newSlides.unshift({
-          id: 'slide-title',
-          content: firstSentence,
-          order: 0,
-          characterCount: firstSentence.length
-        });
-        // Update order numbers
-        newSlides.forEach((slide, index) => {
-          slide.order = index + 1;
-        });
-      }
-    }
+    // Update order numbers to be sequential
+    newSlides.forEach((slide, index) => {
+      slide.order = index + 1;
+    });
     
     setSlides(newSlides);
     setCurrentSlide(0);
@@ -204,10 +225,111 @@ export default function LinkedInCarouselGenerator() {
     }, 'image/png');
   };
 
-  const downloadAllSlides = () => {
-    slides.forEach((_, index) => {
-      setTimeout(() => downloadSlide(index), index * 500); // Stagger downloads
-    });
+  const downloadAllSlides = async () => {
+    // Create a new JSZip instance
+    const zip = new (window as any).JSZip();
+    
+    // Generate all slide images and add them to the zip
+    for (let i = 0; i < slides.length; i++) {
+      const slide = slides[i];
+      if (!slide) continue;
+
+      // Create canvas for this slide
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) continue;
+
+      // Set canvas dimensions (LinkedIn optimal: 1080x1080)
+      canvas.width = 1080;
+      canvas.height = 1080;
+
+      // Set background based on template
+      let bgColor = '#1976d2'; // Professional blue
+      if (styleOptions.template === 'creative') bgColor = '#9c27b0'; // Purple
+      if (styleOptions.template === 'minimal') bgColor = '#ffffff'; // White
+
+      // Fill background
+      if (styleOptions.template === 'minimal') {
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = '#e0e0e0';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(0, 0, canvas.width, canvas.height);
+      } else {
+        // Create gradient
+        const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+        if (styleOptions.template === 'professional') {
+          gradient.addColorStop(0, '#1976d2');
+          gradient.addColorStop(1, '#1565c0');
+        } else {
+          gradient.addColorStop(0, '#9c27b0');
+          gradient.addColorStop(1, '#e91e63');
+        }
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
+      // Set text properties
+      const fontSize = styleOptions.fontSize === 'small' ? 32 : styleOptions.fontSize === 'large' ? 48 : 40;
+      ctx.font = `${fontSize}px Arial, sans-serif`;
+      ctx.fillStyle = styleOptions.template === 'minimal' ? '#333333' : '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // Wrap text
+      const words = slide.content.split(' ');
+      const lines = [];
+      let currentLine = '';
+      const maxWidth = canvas.width - 160; // 80px margin on each side
+
+      words.forEach(word => {
+        const testLine = currentLine + (currentLine ? ' ' : '') + word;
+        const metrics = ctx.measureText(testLine);
+        
+        if (metrics.width > maxWidth && currentLine !== '') {
+          lines.push(currentLine);
+          currentLine = word;
+        } else {
+          currentLine = testLine;
+        }
+      });
+      if (currentLine) lines.push(currentLine);
+
+      // Draw text lines
+      const lineHeight = fontSize * 1.4;
+      const totalHeight = lines.length * lineHeight;
+      const startY = (canvas.height - totalHeight) / 2 + fontSize / 2;
+
+      lines.forEach((line, index) => {
+        ctx.fillText(line, canvas.width / 2, startY + index * lineHeight);
+      });
+
+      // Add slide number
+      ctx.font = '24px Arial, sans-serif';
+      ctx.fillStyle = styleOptions.template === 'minimal' ? '#666666' : 'rgba(255,255,255,0.7)';
+      ctx.fillText(`${i + 1} / ${slides.length}`, canvas.width / 2, canvas.height - 40);
+
+      // Convert canvas to blob and add to zip
+      const blob = await new Promise<Blob>((resolve) => {
+        canvas.toBlob((blob) => {
+          resolve(blob!);
+        }, 'image/png');
+      });
+
+      // Add the image to the zip with a filename
+      zip.file(`linkedin-carousel-slide-${String(i + 1).padStart(2, '0')}.png`, blob);
+    }
+
+    // Generate the zip file and trigger download
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `linkedin-carousel-${slides.length}-slides.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -350,7 +472,7 @@ export default function LinkedInCarouselGenerator() {
                     <div className="text-center text-gray-500">
                       <Image className="w-16 h-16 mx-auto mb-4 opacity-50" />
                       <p className="text-lg font-medium mb-2">No slides generated yet</p>
-                      <p className="text-sm">{`Add your content and click "Generate Slides" to see the preview`}</p>
+                      <p className="text-sm">Add your content and click "Generate Slides" to see the preview</p>
                     </div>
                   </div>
                 )}
@@ -401,10 +523,15 @@ export default function LinkedInCarouselGenerator() {
                 <div className="space-y-3">
                   <button 
                     onClick={downloadAllSlides}
-                    className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
+                    disabled={!isZipLibLoaded}
+                    className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2"
                   >
                     <Download className="w-4 h-4" />
-                    <span>Download All Slides ({slides.length} images)</span>
+                    <span>
+                      {isZipLibLoaded 
+                        ? `Download All Slides (ZIP - ${slides.length} images)` 
+                        : 'Loading ZIP functionality...'}
+                    </span>
                   </button>
                   
                   <button 
@@ -418,7 +545,7 @@ export default function LinkedInCarouselGenerator() {
                 
                 <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                   <p className="text-sm text-blue-800">
-                    <strong>LinkedIn Tip:</strong> {`Upload images in order to create your carousel post. Each slide is optimized at 1080x1080px for LinkedIn's requirements.`}
+                    <strong>LinkedIn Tip:</strong> Upload images in order to create your carousel post. Each slide is optimized at 1080x1080px for LinkedIn's requirements.
                   </p>
                 </div>
                 
