@@ -31,9 +31,9 @@ export default function LinkedInCarouselGenerator() {
     
     setIsGenerating(true);
     
-    // Simple text splitting algorithm (we'll enhance this later)
+    // Enhanced text splitting algorithm
     const sentences = inputText.split(/[.!?]+/).filter(s => s.trim().length > 0);
-    const wordsPerSlide = 30;
+    const wordsPerSlide = 25; // Optimal for LinkedIn readability
     const newSlides: Slide[] = [];
     
     let currentSlideText = '';
@@ -65,13 +65,30 @@ export default function LinkedInCarouselGenerator() {
       });
     }
     
+    // Add a title slide at the beginning if content is long enough
+    if (newSlides.length > 3) {
+      const firstSentence = inputText.split(/[.!?]+/)[0].trim();
+      if (firstSentence.length > 0) {
+        newSlides.unshift({
+          id: 'slide-title',
+          content: firstSentence,
+          order: 0,
+          characterCount: firstSentence.length
+        });
+        // Update order numbers
+        newSlides.forEach((slide, index) => {
+          slide.order = index + 1;
+        });
+      }
+    }
+    
     setSlides(newSlides);
     setCurrentSlide(0);
     setIsGenerating(false);
   };
 
   const getTemplateStyles = () => {
-    const baseStyles = "w-full h-96 p-8 rounded-lg shadow-lg flex items-center justify-center text-center";
+    const baseStyles = "w-full h-96 p-8 rounded-lg shadow-lg flex items-center justify-center text-center transition-all duration-300";
     
     switch (styleOptions.template) {
       case 'professional':
@@ -94,6 +111,105 @@ export default function LinkedInCarouselGenerator() {
     }
   };
 
+  const downloadSlide = (slideIndex: number) => {
+    const slide = slides[slideIndex];
+    if (!slide) return;
+
+    // Create a canvas to generate the image
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Set canvas dimensions (LinkedIn optimal: 1080x1080)
+    canvas.width = 1080;
+    canvas.height = 1080;
+
+    // Set background based on template
+    let bgColor = '#1976d2'; // Professional blue
+    if (styleOptions.template === 'creative') bgColor = '#9c27b0'; // Purple
+    if (styleOptions.template === 'minimal') bgColor = '#ffffff'; // White
+
+    // Fill background
+    if (styleOptions.template === 'minimal') {
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = '#e0e0e0';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(0, 0, canvas.width, canvas.height);
+    } else {
+      // Create gradient
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      if (styleOptions.template === 'professional') {
+        gradient.addColorStop(0, '#1976d2');
+        gradient.addColorStop(1, '#1565c0');
+      } else {
+        gradient.addColorStop(0, '#9c27b0');
+        gradient.addColorStop(1, '#e91e63');
+      }
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // Set text properties
+    const fontSize = styleOptions.fontSize === 'small' ? 32 : styleOptions.fontSize === 'large' ? 48 : 40;
+    ctx.font = `${fontSize}px Arial, sans-serif`;
+    ctx.fillStyle = styleOptions.template === 'minimal' ? '#333333' : '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Wrap text
+    const words = slide.content.split(' ');
+    const lines = [];
+    let currentLine = '';
+    const maxWidth = canvas.width - 160; // 80px margin on each side
+
+    words.forEach(word => {
+      const testLine = currentLine + (currentLine ? ' ' : '') + word;
+      const metrics = ctx.measureText(testLine);
+      
+      if (metrics.width > maxWidth && currentLine !== '') {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = testLine;
+      }
+    });
+    if (currentLine) lines.push(currentLine);
+
+    // Draw text lines
+    const lineHeight = fontSize * 1.4;
+    const totalHeight = lines.length * lineHeight;
+    const startY = (canvas.height - totalHeight) / 2 + fontSize / 2;
+
+    lines.forEach((line, index) => {
+      ctx.fillText(line, canvas.width / 2, startY + index * lineHeight);
+    });
+
+    // Add slide number
+    ctx.font = '24px Arial, sans-serif';
+    ctx.fillStyle = styleOptions.template === 'minimal' ? '#666666' : 'rgba(255,255,255,0.7)';
+    ctx.fillText(`${slideIndex + 1} / ${slides.length}`, canvas.width / 2, canvas.height - 40);
+
+    // Download the image
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `linkedin-carousel-slide-${slideIndex + 1}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  };
+
+  const downloadAllSlides = () => {
+    slides.forEach((_, index) => {
+      setTimeout(() => downloadSlide(index), index * 500); // Stagger downloads
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -101,7 +217,7 @@ export default function LinkedInCarouselGenerator() {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-linkedin-blue rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                 <Image className="w-5 h-5 text-white" />
               </div>
               <h1 className="text-2xl font-bold text-gray-900">LinkedIn Carousel Generator</h1>
@@ -127,7 +243,7 @@ export default function LinkedInCarouselGenerator() {
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 placeholder="Paste your long-form content here... I'll help you transform it into an engaging LinkedIn carousel that will capture your audience's attention and drive meaningful engagement."
-                className="w-full h-64 p-4 border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-linkedin-blue focus:border-linkedin-blue transition-colors"
+                className="w-full h-64 p-4 border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                 maxLength={3000}
               />
               
@@ -136,7 +252,7 @@ export default function LinkedInCarouselGenerator() {
                 <button
                   onClick={handleGenerateSlides}
                   disabled={!inputText.trim() || isGenerating}
-                  className="px-6 py-2 bg-linkedin-blue text-white rounded-lg hover:bg-linkedin-lightblue disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors"
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors"
                 >
                   {isGenerating ? (
                     <>
@@ -171,8 +287,8 @@ export default function LinkedInCarouselGenerator() {
                         onClick={() => setStyleOptions(prev => ({ ...prev, template }))}
                         className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
                           styleOptions.template === template
-                            ? 'bg-linkedin-blue text-black border-linkedin-blue'
-                            : 'bg-white text-black border-gray-200 hover:border-linkedin-blue'
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-gray-700 border-gray-200 hover:border-blue-600'
                         }`}
                       >
                         {template.charAt(0).toUpperCase() + template.slice(1)}
@@ -189,10 +305,10 @@ export default function LinkedInCarouselGenerator() {
                       <button
                         key={size}
                         onClick={() => setStyleOptions(prev => ({ ...prev, fontSize: size }))}
-                        className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
+                        className={`px-3 py-2 text-sm rounded-lg border transition-colors flex items-center justify-center ${
                           styleOptions.fontSize === size
-                            ? 'bg-linkedin-blue text-black border-linkedin-blue'
-                            : 'bg-white text-black border-gray-200 hover:border-linkedin-blue'
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-gray-700 border-gray-200 hover:border-blue-600'
                         }`}
                       >
                         <Type className={`w-${size === 'small' ? '3' : size === 'medium' ? '4' : '5'} h-${size === 'small' ? '3' : size === 'medium' ? '4' : '5'}`} />
@@ -220,9 +336,14 @@ export default function LinkedInCarouselGenerator() {
               <div className="mb-6">
                 {slides.length > 0 ? (
                   <div className={getTemplateStyles()}>
-                    <p className={`${getFontSize()} leading-relaxed max-w-md`}>
-                      {slides[currentSlide]?.content}
-                    </p>
+                    <div className="max-w-md">
+                      <p className={`${getFontSize()} leading-relaxed`}>
+                        {slides[currentSlide]?.content}
+                      </p>
+                      <div className="mt-4 text-xs opacity-70">
+                        {currentSlide + 1} / {slides.length}
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div className="w-full h-96 bg-gray-100 rounded-lg flex items-center justify-center">
@@ -252,7 +373,7 @@ export default function LinkedInCarouselGenerator() {
                         key={index}
                         onClick={() => setCurrentSlide(index)}
                         className={`w-3 h-3 rounded-full transition-colors ${
-                          currentSlide === index ? 'bg-linkedin-blue' : 'bg-gray-300'
+                          currentSlide === index ? 'bg-blue-600' : 'bg-gray-300'
                         }`}
                       />
                     ))}
@@ -278,12 +399,18 @@ export default function LinkedInCarouselGenerator() {
                 </h3>
                 
                 <div className="space-y-3">
-                  <button className="w-full px-4 py-3 bg-linkedin-blue text-white rounded-lg hover:bg-linkedin-lightblue transition-colors flex items-center justify-center space-x-2">
+                  <button 
+                    onClick={downloadAllSlides}
+                    className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
+                  >
                     <Download className="w-4 h-4" />
-                    <span>Download All Slides (ZIP)</span>
+                    <span>Download All Slides ({slides.length} images)</span>
                   </button>
                   
-                  <button className="w-full px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center space-x-2">
+                  <button 
+                    onClick={() => downloadSlide(currentSlide)}
+                    className="w-full px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center space-x-2"
+                  >
                     <Image className="w-4 h-4" />
                     <span>Download Current Slide</span>
                   </button>
@@ -291,9 +418,15 @@ export default function LinkedInCarouselGenerator() {
                 
                 <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                   <p className="text-sm text-blue-800">
-                    <strong>LinkedIn Tip:</strong> Upload images in order to create your carousel post. Each slide will be optimized for LinkedIn's image requirements.
+                    <strong>LinkedIn Tip:</strong> Upload images in order to create your carousel post. Each slide is optimized at 1080x1080px for LinkedIn's requirements.
                   </p>
                 </div>
+                
+                {slides.length > 0 && (
+                  <div className="mt-3 text-xs text-gray-500">
+                    Generated {slides.length} slides • Total characters: {slides.reduce((sum, slide) => sum + slide.characterCount, 0)}
+                  </div>
+                )}
               </div>
             )}
           </div>
