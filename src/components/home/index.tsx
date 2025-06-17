@@ -48,7 +48,7 @@ export default function LinkedInCarouselGenerator() {
     const paragraphs = inputText
       .split(/\n\s*\n|\n/)
       .filter((p) => p.trim().length > 0);
-    const wordsPerSlide = 25; // Optimal for LinkedIn readability
+    const wordsPerSlide = 50;
     const newSlides: Slide[] = [];
     let slideCounter = 0;
 
@@ -56,10 +56,8 @@ export default function LinkedInCarouselGenerator() {
       const trimmedParagraph = paragraph.trim();
       if (!trimmedParagraph) return;
 
-      // Check if the paragraph is short enough to be a single slide
       const words = trimmedParagraph.split(" ");
       if (words.length <= wordsPerSlide) {
-        // Add as a single slide
         newSlides.push({
           id: `slide-${slideCounter++}`,
           content: trimmedParagraph,
@@ -67,7 +65,6 @@ export default function LinkedInCarouselGenerator() {
           characterCount: trimmedParagraph.length,
         });
       } else {
-        // Split longer paragraphs by sentences
         const sentences = trimmedParagraph
           .split(/[.!?]+/)
           .filter((s) => s.trim().length > 0);
@@ -81,7 +78,6 @@ export default function LinkedInCarouselGenerator() {
               wordsPerSlide &&
             currentSlideText.length > 0
           ) {
-            // Create a new slide with current content
             newSlides.push({
               id: `slide-${slideCounter++}`,
               content: currentSlideText.trim(),
@@ -95,7 +91,6 @@ export default function LinkedInCarouselGenerator() {
           }
         });
 
-        // Add the remaining content as a slide
         if (currentSlideText.trim()) {
           newSlides.push({
             id: `slide-${slideCounter++}`,
@@ -107,7 +102,6 @@ export default function LinkedInCarouselGenerator() {
       }
     });
 
-    // Update order numbers to be sequential
     newSlides.forEach((slide, index) => {
       slide.order = index + 1;
     });
